@@ -31,15 +31,26 @@ Arguments:
   [url]                     Direct URL to process (portfolio or resume)
 
 Options:
-  --type <type>             Hint the type of URL: 'portfolio' or 'resume' *for single URL only*
-  --portfolios              Process portfolio links from CSV
-  --resumes                 Process resume PDFs from directory
-  --all                     Process both portfolios and resumes
-  --portfolio-csv <path>    Path to portfolio CSV file (default: ./portfolio_links.csv)
-  --resumes-dir <path>      Path to resumes directory (default: ./resumes)
-  --provider <name>         Browser provider: puppeteer, browserless, or fetch
-  --json                    Output results as JSON
-  -h, --help                Display help
+
+  General:
+    --output-dir <dir>        Write results to a directory organized by candidate (keeps terminal clean)
+    --json                    Output raw JSON to stdout
+    -V, --version             Output version number
+    -h, --help                Display help
+
+  Single URL:
+    --type <type>             Hint the type of URL: 'portfolio' or 'resume'
+
+  Batch Processing:
+    --all                     Process both portfolios and resumes
+    --portfolios              Process portfolio links from CSV
+    --resumes                 Process resume PDFs from directory
+    --portfolio-csv <path>    Path to portfolio CSV file (default: ./portfolio_links.csv)
+    --resumes-dir <path>      Path to resumes directory (default: ./resumes)
+
+  Browser Options:
+    --provider <name>         Provider (auto-uses puppeteer if found, else fetch. Force with 'puppeteer', 'browserless', 'fetch')
+    --browserless-url <url>   Browserless instance URL
 ```
 
 ## Examples
@@ -72,7 +83,23 @@ Process a list of candidates from a CSV and a directory of local resumes.
 ```bash
 # Process both portfolios and resumes
 gitresolve --all
+
+# Process and silently save the aggregated candidates to a directory
+gitresolve --all --output-dir results/
 ```
+
+### Saving Analysis (Candidate Aggregation)
+When you process multiple sources (e.g., a portfolio link and a resume PDF) that resolve to the same GitHub candidate, GitResolve will **automatically merge them** into a single, unified profile.
+
+```bash
+# Saves aggregated JSON files to the results/ directory (e.g., results/resolved/janedoe.json)
+gitresolve --all --output-dir results/
+
+# Skip the terminal UI entirely and dump the merged JSON array to stdout (great for piping)
+gitresolve --all --json
+```
+
+*(Note: Need direct integrations or custom CSV mapping for ATS platforms like Lever, Greenhouse, or Ashby? Please open an issue and let us know!)*
 
 ## How it works
 

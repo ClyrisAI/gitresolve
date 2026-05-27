@@ -1,6 +1,6 @@
 {
   "name": "@clyrisai/gitresolve",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "ClyrisAI",
   "repository": {
     "type": "git",
@@ -11,6 +11,7 @@
     "commander": "^13.0.0",
     "csv-parse": "^5.6.0",
     "pdfjs-dist": "^4.10.38",
+    "puppeteer": "^25.1.0",
     "unpdf": "^0.12.1"
   },
   "devDependencies": {

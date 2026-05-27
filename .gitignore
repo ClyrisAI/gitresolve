@@ -7,3 +7,4 @@ create.py
 *.log
 coverage/
 .antigravitycli/
+results/

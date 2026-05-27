@@ -9,9 +9,71 @@ import { scrapePortfolio } from "./portfolio-scraper.js";
 import { parseResume } from "./resume-parser.js";
 import { createProvider } from "./browser/factory.js";
 import { printResult, printSummary, c, resetResultCounter } from "./printer.js";
-import type { ResolverResult } from "./types.js";
 import type { ProviderName } from "./browser/factory.js";
 import type { BrowserProvider } from "./browser/types.js";
+import type { ResolverResult, AggregatedResult, ExtractedGitLink } from "./types.js";
+
+// ─── Aggregation ────────────────────────────────────────────────────
+
+function aggregateResults(results: ResolverResult[]): AggregatedResult[] {
+  const map = new Map<string, AggregatedResult>();
+  const unresolved: AggregatedResult[] = [];
+
+  for (const r of results) {
+    if (!r.ownerProfile || !r.ownerProfile.username) {
+      unresolved.push({
+        candidateUsername: null,
+        sources: [r.source],
+        sourceTypes: [r.sourceType],
+        ownerProfile: r.ownerProfile,
+        confidence: r.confidence,
+        ownedRepos: r.ownedRepos,
+        externalRepos: r.externalRepos,
+        allLinks: r.allLinks,
+        warnings: r.warnings
+      });
+      continue;
+    }
+    
+    const un = r.ownerProfile.username.toLowerCase();
+    if (map.has(un)) {
+      const existing = map.get(un)!;
+      existing.sources.push(r.source);
+      existing.sourceTypes.push(r.sourceType);
+      
+      const mergeLinks = (a: ExtractedGitLink[], b: ExtractedGitLink[]) => {
+        const seen = new Set(a.map(x => x.url.toLowerCase()));
+        const merged = [...a];
+        for (const link of b) {
+          if (!seen.has(link.url.toLowerCase())) {
+            seen.add(link.url.toLowerCase());
+            merged.push(link);
+          }
+        }
+        return merged;
+      };
+      
+      existing.ownedRepos = mergeLinks(existing.ownedRepos, r.ownedRepos);
+      existing.externalRepos = mergeLinks(existing.externalRepos, r.externalRepos);
+      existing.allLinks = mergeLinks(existing.allLinks, r.allLinks);
+      existing.warnings.push(...r.warnings);
+    } else {
+      map.set(un, {
+        candidateUsername: r.ownerProfile.username,
+        sources: [r.source],
+        sourceTypes: [r.sourceType],
+        ownerProfile: r.ownerProfile,
+        confidence: r.confidence,
+        ownedRepos: [...r.ownedRepos],
+        externalRepos: [...r.externalRepos],
+        allLinks: [...r.allLinks],
+        warnings: [...r.warnings]
+      });
+    }
+  }
+  
+  return [...Array.from(map.values()), ...unresolved];
+}
 
 // ─── CLI Setup ──────────────────────────────────────────────────────
 
@@ -30,7 +92,7 @@ program
   .option("--resumes-dir <path>", "Path to resumes directory", process.env.RESUMES_DIR || "./data/resumes")
   .option("--provider <name>", "Browser provider: puppeteer, browserless, or fetch")
   .option("--json", "Output results as JSON")
-  .option("--output <file>", "Write results to a file")
+  .option("--output-dir <dir>", "Write results to a directory organized by candidate")
   .option("--browserless-url <url>", "Browserless instance URL (overrides BROWSERLESS_URL env var)");
 
 program.parse();
@@ -114,7 +176,7 @@ async function main(): Promise<void> {
           result.source = urlArg;
           result.sourceType = "resume_url";
           allResults.push(result);
-          if (!opts.json) printResult(result);
+          if (!opts.json && !opts.outputDir) printResult(result);
         } catch (err) {
           if (!opts.json) console.error(`${c.red}   ❌ Error fetching/parsing resume: ${err}${c.reset}`);
         }
@@ -126,7 +188,7 @@ async function main(): Promise<void> {
         if (inputType === "portfolio") {
           const result = await scrapePortfolio(urlArg, provider!);
           allResults.push(result);
-          if (!opts.json) printResult(result);
+          if (!opts.json && !opts.outputDir) printResult(result);
         } else if (inputType === "github_profile") {
           const username = urlArg.replace(/\/+$/, "").split("/").pop()!;
           allResults.push({
@@ -139,7 +201,7 @@ async function main(): Promise<void> {
             allLinks: [{ url: urlArg, provider: "github", type: "profile", username }],
             warnings: ["Already a GitHub profile URL — no scraping needed"],
           });
-          if (!opts.json) printResult(allResults[allResults.length - 1]);
+          if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
         } else if (inputType === "repo_url") {
           const parsed = parseRepoUrl(urlArg);
           if (parsed.valid && parsed.data) {
@@ -161,7 +223,7 @@ async function main(): Promise<void> {
               warnings: [`Already a ${d.provider} repo URL — extracted owner profile`],
             });
           }
-          if (!opts.json) printResult(allResults[allResults.length - 1]);
+          if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
         } else {
           allResults.push({
             source: urlArg,
@@ -173,7 +235,7 @@ async function main(): Promise<void> {
             allLinks: [],
             warnings: [`Input classified as '${inputType}' — cannot resolve`],
           });
-          if (!opts.json) printResult(allResults[allResults.length - 1]);
+          if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
         }
       }
     }
@@ -208,7 +270,7 @@ async function main(): Promise<void> {
           if (inputType === "portfolio") {
             const result = await scrapePortfolio(url, provider!);
             allResults.push(result);
-            if (!opts.json) printResult(result);
+            if (!opts.json && !opts.outputDir) printResult(result);
           } else if (inputType === "github_profile") {
             const username = url.replace(/\/+$/, "").split("/").pop()!;
             allResults.push({
@@ -221,7 +283,7 @@ async function main(): Promise<void> {
               allLinks: [{ url, provider: "github", type: "profile", username }],
               warnings: ["Already a GitHub profile URL — no scraping needed"],
             });
-            if (!opts.json) printResult(allResults[allResults.length - 1]);
+            if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
           } else if (inputType === "repo_url") {
             const parsed = parseRepoUrl(url);
             if (parsed.valid && parsed.data) {
@@ -243,7 +305,7 @@ async function main(): Promise<void> {
                 warnings: [`Already a ${d.provider} repo URL — extracted owner profile`],
               });
             }
-            if (!opts.json) printResult(allResults[allResults.length - 1]);
+            if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
           } else {
             allResults.push({
               source: url,
@@ -255,7 +317,7 @@ async function main(): Promise<void> {
               allLinks: [],
               warnings: [`Input classified as '${inputType}' — cannot resolve`],
             });
-            if (!opts.json) printResult(allResults[allResults.length - 1]);
+            if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
           }
         }
       } catch (err) {
@@ -285,7 +347,7 @@ async function main(): Promise<void> {
           const filePath = join(resumesDir, file);
           const result = await parseResume(filePath);
           allResults.push(result);
-          if (!opts.json) printResult(result);
+          if (!opts.json && !opts.outputDir) printResult(result);
         }
       } catch (err) {
         if (!opts.json) {
@@ -295,21 +357,39 @@ async function main(): Promise<void> {
     }
 
     // ── Output ──
+    const aggregated = aggregateResults(allResults);
+
     if (opts.json) {
-      const jsonOutput = JSON.stringify(allResults, null, 2);
-      if (opts.output) {
-        await writeFile(opts.output, jsonOutput, "utf-8");
-      } else {
-        console.log(jsonOutput);
+      console.log(JSON.stringify(aggregated, null, 2));
+    }
+    
+    if (opts.outputDir) {
+      const { mkdir } = await import("fs/promises");
+      const resolvedDir = join(opts.outputDir, "resolved");
+      const unresolvedDir = join(opts.outputDir, "unresolved");
+      await mkdir(resolvedDir, { recursive: true });
+      await mkdir(unresolvedDir, { recursive: true });
+
+      let unresolvedCount = 0;
+      for (const agg of aggregated) {
+        if (agg.candidateUsername) {
+          const outPath = join(resolvedDir, `${agg.candidateUsername}.json`);
+          await writeFile(outPath, JSON.stringify(agg, null, 2), "utf-8");
+        } else {
+          unresolvedCount++;
+          const base = basename(agg.sources[0]).replace(/[^a-z0-9]/gi, '_');
+          const outPath = join(unresolvedDir, `${base}_${unresolvedCount}.json`);
+          await writeFile(outPath, JSON.stringify(agg, null, 2), "utf-8");
+        }
       }
-    } else if (opts.output) {
-      const jsonOutput = JSON.stringify(allResults, null, 2);
-      await writeFile(opts.output, jsonOutput, "utf-8");
-      console.log(`\n${c.dim}Results written to ${opts.output}${c.reset}`);
+      
+      if (!opts.json) {
+        console.log(`\n${c.dim}Results written to ${opts.outputDir}/${c.reset}`);
+      }
     }
 
     if (!opts.json && allResults.length > 0) {
-      printSummary(allResults);
+      printSummary(aggregated);
     } else if (!opts.json && allResults.length === 0) {
       console.log(`\n${c.yellow}⚠️  No inputs processed. Use --portfolios, --resumes, or --all${c.reset}`);
     }

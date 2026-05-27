@@ -67,6 +67,25 @@ export interface ResolverResult {
   error?: string;
 }
 
+/**
+ * An aggregated profile combining multiple sources (e.g. portfolio + resume)
+ * resolved to the same GitHub candidate.
+ */
+export interface AggregatedResult {
+  candidateUsername: string | null;        // The resolved GitHub username, or null if unresolved
+  sources: string[];                       // e.g. ["https://janedoe.dev", "./resumes/janedoe.pdf"]
+  sourceTypes: InputType[];
+  
+  ownerProfile: ExtractedGitLink | null;
+  confidence: "high" | "medium" | "low" | "none";
+  
+  ownedRepos: ExtractedGitLink[];
+  externalRepos: ExtractedGitLink[];
+  allLinks: ExtractedGitLink[];
+  
+  warnings: string[];
+}
+
 // ─── Provider Hosts ─────────────────────────────────────────────────
 
 export const GIT_HOSTS: Record<string, GitProvider> = {

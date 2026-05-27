@@ -1,5 +1,5 @@
 import { basename } from "path";
-import type { ResolverResult } from "./types.js";
+import type { ResolverResult, AggregatedResult } from "./types.js";
 
 // ─── ANSI Colors ────────────────────────────────────────────────────
 
@@ -89,34 +89,30 @@ export function printResult(result: ResolverResult): void {
   console.log(`${c.cyan}└${"─".repeat(72)}┘${c.reset}`);
 }
 
-export function printSummary(results: ResolverResult[]): void {
+export function printSummary(results: AggregatedResult[]): void {
   const total = results.length;
   const resolved = results.filter((r) => r.ownerProfile !== null).length;
   const high = results.filter((r) => r.confidence === "high").length;
   const medium = results.filter((r) => r.confidence === "medium").length;
   const low = results.filter((r) => r.confidence === "low").length;
   const none = results.filter((r) => r.confidence === "none").length;
-  const errors = results.filter((r) => r.error).length;
   const totalOwned = results.reduce((sum, r) => sum + r.ownedRepos.length, 0);
   const totalExternal = results.reduce((sum, r) => sum + r.externalRepos.length, 0);
 
   console.log("");
   console.log(`${c.magenta}╔${"═".repeat(72)}╗${c.reset}`);
-  console.log(`${c.magenta}║${c.reset} ${c.bold}📊 SUMMARY${c.reset}`);
+  console.log(`${c.magenta}║${c.reset} ${c.bold}📊 AGGREGATED SUMMARY${c.reset}`);
   console.log(`${c.magenta}╠${"═".repeat(72)}╣${c.reset}`);
   console.log(`${c.magenta}║${c.reset}  Candidates:  ${c.bold}${total}${c.reset} total, ${c.green}${resolved} resolved${c.reset}, ${c.red}${total - resolved} unresolved${c.reset}`);
   console.log(`${c.magenta}║${c.reset}  Confidence:  ✅ ${high} high   🟡 ${medium} medium   🟠 ${low} low   ❌ ${none} none`);
   console.log(`${c.magenta}║${c.reset}  Repos found: ${c.green}${totalOwned} owned${c.reset}, ${c.blue}${totalExternal} external${c.reset}`);
-  if (errors > 0) {
-    console.log(`${c.magenta}║${c.reset}  ${c.red}🚨 Errors: ${errors}${c.reset}`);
-  }
   console.log(`${c.magenta}╚${"═".repeat(72)}╝${c.reset}`);
 
   // Resolved candidates table
   const resolvedList = results
     .filter((r) => r.ownerProfile)
     .map((r) => ({
-      source: basename(r.source),
+      sources: r.sources.map(s => basename(s)).join(", "),
       provider: r.ownerProfile!.provider,
       username: r.ownerProfile!.username,
       owned: r.ownedRepos.length,
@@ -133,16 +129,16 @@ export function printSummary(results: ResolverResult[]): void {
   if (unresolved.length > 0) {
     console.log(`\n${c.bold}📋 Unresolved (needs manual review):${c.reset}`);
     for (const r of unresolved) {
-      let msg = r.error || "";
-      if (!msg && r.warnings.length > 0) {
+      let msg = "";
+      if (r.warnings.length > 0) {
         msg = r.warnings.join("; ");
       }
-      if (!r.error && r.allLinks.length === 0 && !msg.includes("No git links found")) {
+      if (r.allLinks.length === 0 && !msg.includes("No git links found")) {
         msg = msg ? `${msg}; No git links found` : "No git links found";
       } else if (!msg) {
         msg = "No owner profile resolved";
       }
-      console.log(`  ${c.red}✗${c.reset} ${basename(r.source)}: ${c.dim}${msg}${c.reset}`);
+      console.log(`  ${c.red}✗${c.reset} ${r.sources.map(s => basename(s)).join(", ")}: ${c.dim}${msg}${c.reset}`);
     }
   }
 }
