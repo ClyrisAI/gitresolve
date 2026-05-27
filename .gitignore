@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/
+create.py
+.env
+.DS_Store
+*.log
+coverage/
+.antigravitycli/

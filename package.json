@@ -1,0 +1,54 @@
+{
+  "name": "@clyrisai/gitresolve",
+  "version": "0.1.1",
+  "author": "ClyrisAI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clyrisai/gitresolve"
+  },
+  "main": "./dist/index.js",
+  "dependencies": {
+    "commander": "^13.0.0",
+    "csv-parse": "^5.6.0",
+    "pdfjs-dist": "^4.10.38",
+    "unpdf": "^0.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "bin": {
+    "gitresolve": "./dist/cli.js"
+  },
+  "description": "Resolve candidate portfolios, resumes, and URLs into GitHub/GitLab/Bitbucket profiles and repos",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": ["github", "gitlab", "bitbucket", "portfolio", "resume", "git", "profile", "resolver", "scraper"],
+  "license": "MIT",
+  "peerDependenciesMeta": {
+    "puppeteer": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "bun run src/cli.ts",
+    "dev:portfolios": "bun run src/cli.ts --portfolios",
+    "dev:resumes": "bun run src/cli.ts --resumes",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit",
+    "release": "bun run test && bun run build && npm publish --access public"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts"
+}

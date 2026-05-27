@@ -1,0 +1,15 @@
+node_modules/
+src/
+tests/
+data/
+create.py
+.env
+.DS_Store
+*.log
+coverage/
+vitest.config.ts
+tsconfig.json
+tsconfig.build.json
+bun.lock
+.antigravitycli/
+CLAUDE.md
