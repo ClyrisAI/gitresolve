@@ -2,6 +2,9 @@
 
 Resolve candidate portfolios, resumes, and URLs into GitHub/GitLab/Bitbucket profiles and repos.
 
+> **🚀 Enterprise ATS Integrations (Lever, Greenhouse, Ashby)**
+> Are you processing massive CSV dumps from your ATS with custom columns? If you need native zero-configuration mapping for your ATS platform, please **[Open an Issue](https://github.com/ClyrisAI/gitresolve/issues)** and let us know! We are prioritizing specific integrations based on user demand.
+
 ## Install
 
 GitResolve can be run instantly via `npx`, or installed globally for permanent CLI use.
@@ -99,7 +102,31 @@ gitresolve --all --output-dir results/
 gitresolve --all --json
 ```
 
-*(Note: Need direct integrations or custom CSV mapping for ATS platforms like Lever, Greenhouse, or Ashby? Please open an issue and let us know!)*
+**Example Aggregated Output (`results/resolved/janedoe.json`):**
+```json
+{
+  "candidateUsername": "janedoe",
+  "sources": [
+    "https://janedoe.dev",
+    "./data/resumes/janedoe.pdf"
+  ],
+  "sourceTypes": [
+    "portfolio",
+    "resume_file"
+  ],
+  "ownerProfile": { 
+    "url": "https://github.com/janedoe", 
+    "provider": "github", 
+    "type": "profile", 
+    "username": "janedoe" 
+  },
+  "confidence": "high",
+  "ownedRepos": [],
+  "externalRepos": [],
+  "allLinks": [],
+  "warnings": []
+}
+```
 
 ## How it works
 
@@ -111,21 +138,21 @@ gitresolve --all --json
 
 Each processed input returns a structured result:
 
-```typescript
+```json
 {
-  source: "https://janedoe.dev",
-  sourceType: "portfolio",
-  ownerProfile: { 
-    url: "https://github.com/janedoe", 
-    provider: "github", 
-    type: "profile", 
-    username: "janedoe" 
+  "source": "https://janedoe.dev",
+  "sourceType": "portfolio",
+  "ownerProfile": { 
+    "url": "https://github.com/janedoe", 
+    "provider": "github", 
+    "type": "profile", 
+    "username": "janedoe" 
   },
-  confidence: "high",
-  ownedRepos: [],
-  externalRepos: [],
-  allLinks: [],
-  warnings: []
+  "confidence": "high",
+  "ownedRepos": [],
+  "externalRepos": [],
+  "allLinks": [],
+  "warnings": []
 }
 ```
 
