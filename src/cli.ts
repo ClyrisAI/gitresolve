@@ -28,6 +28,7 @@ function aggregateResults(results: ResolverResult[]): AggregatedResult[] {
         ownerProfile: r.ownerProfile,
         confidence: r.confidence,
         ownedRepos: r.ownedRepos,
+        contributions: r.contributions,
         externalRepos: r.externalRepos,
         allLinks: r.allLinks,
         warnings: r.warnings
@@ -54,6 +55,7 @@ function aggregateResults(results: ResolverResult[]): AggregatedResult[] {
       };
       
       existing.ownedRepos = mergeLinks(existing.ownedRepos, r.ownedRepos);
+      existing.contributions = mergeLinks(existing.contributions, r.contributions);
       existing.externalRepos = mergeLinks(existing.externalRepos, r.externalRepos);
       existing.allLinks = mergeLinks(existing.allLinks, r.allLinks);
       existing.warnings.push(...r.warnings);
@@ -65,6 +67,7 @@ function aggregateResults(results: ResolverResult[]): AggregatedResult[] {
         ownerProfile: r.ownerProfile,
         confidence: r.confidence,
         ownedRepos: [...r.ownedRepos],
+        contributions: [...r.contributions],
         externalRepos: [...r.externalRepos],
         allLinks: [...r.allLinks],
         warnings: [...r.warnings]
@@ -120,7 +123,7 @@ async function main(): Promise<void> {
 
   const urlTypeHint = opts.type;
   const urlClassifiedType = urlArg ? classifyInput(urlArg) : undefined;
-  const isUrlPortfolio = urlArg && urlTypeHint !== "resume" && (urlTypeHint === "portfolio" || urlClassifiedType === "portfolio" || urlClassifiedType === "github_profile");
+  const isUrlPortfolio = urlArg && urlTypeHint !== "resume" && (urlTypeHint === "portfolio" || urlClassifiedType === "portfolio" || urlClassifiedType === "git_profile" || urlClassifiedType === "repo_url");
 
   if (runPortfolios || isUrlPortfolio) {
     provider = await createProvider(providerName);
@@ -185,33 +188,38 @@ async function main(): Promise<void> {
           inputType = "portfolio";
         }
         
-        if (inputType === "portfolio" || inputType === "github_profile") {
-          const result = await scrapePortfolio(urlArg, provider!);
+        if (inputType === "portfolio" || inputType === "git_profile" || inputType === "repo_url") {
+          let knownOwnerProfile = undefined;
+          if (inputType === "git_profile" || inputType === "repo_url") {
+            let profProvider: "github" | "gitlab" | "bitbucket" = "github";
+            let username = "";
+            try {
+              const u = new URL(urlArg);
+              const host = u.hostname.toLowerCase();
+              if (host.includes("gitlab")) profProvider = "gitlab";
+              else if (host.includes("bitbucket")) profProvider = "bitbucket";
+
+              if (inputType === "repo_url") {
+                const parsed = parseRepoUrl(urlArg);
+                if (parsed.valid && parsed.data) username = parsed.data.owner;
+                else {
+                  const parts = u.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/");
+                  username = (parts[0] === "users" || parts[0] === "orgs") && parts.length > 1 ? parts[1] : parts[0];
+                }
+              } else {
+                const parts = u.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/");
+                username = (parts[0] === "users" || parts[0] === "orgs") && parts.length > 1 ? parts[1] : parts[0];
+              }
+              knownOwnerProfile = { url: `https://${host}/${username}`, provider: profProvider, type: "profile" as const, username };
+            } catch {
+              username = urlArg.replace(/\/+$/, "").split("/").pop()!;
+              knownOwnerProfile = { url: urlArg, provider: "github" as const, type: "profile" as const, username };
+            }
+          }
+          const result = await scrapePortfolio(urlArg, provider!, knownOwnerProfile);
           result.sourceType = inputType;
           allResults.push(result);
           if (!opts.json && !opts.outputDir) printResult(result);
-        } else if (inputType === "repo_url") {
-          const parsed = parseRepoUrl(urlArg);
-          if (parsed.valid && parsed.data) {
-            const d = parsed.data;
-            const repoLink = { url: urlArg, provider: d.provider, type: "repo" as const, username: d.owner, repo: d.repo };
-            allResults.push({
-              source: urlArg,
-              sourceType: "repo_url",
-              ownerProfile: {
-                url: `https://${d.host}/${d.owner}`,
-                provider: d.provider,
-                type: "profile",
-                username: d.owner,
-              },
-              confidence: "high",
-              ownedRepos: [repoLink],
-              externalRepos: [],
-              allLinks: [repoLink],
-              warnings: [`Already a ${d.provider} repo URL — extracted owner profile`],
-            });
-          }
-          if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
         } else {
           allResults.push({
             source: urlArg,
@@ -219,6 +227,7 @@ async function main(): Promise<void> {
             ownerProfile: null,
             confidence: "none",
             ownedRepos: [],
+            contributions: [],
             externalRepos: [],
             allLinks: [],
             warnings: [`Input classified as '${inputType}' — cannot resolve`],
@@ -255,33 +264,38 @@ async function main(): Promise<void> {
         for (const url of urls) {
           const inputType = classifyInput(url);
 
-          if (inputType === "portfolio" || inputType === "github_profile") {
-            const result = await scrapePortfolio(url, provider!);
+          if (inputType === "portfolio" || inputType === "git_profile" || inputType === "repo_url") {
+            let knownOwnerProfile = undefined;
+            if (inputType === "git_profile" || inputType === "repo_url") {
+              let profProvider: "github" | "gitlab" | "bitbucket" = "github";
+              let username = "";
+              try {
+                const u = new URL(url);
+                const host = u.hostname.toLowerCase();
+                if (host.includes("gitlab")) profProvider = "gitlab";
+                else if (host.includes("bitbucket")) profProvider = "bitbucket";
+
+                if (inputType === "repo_url") {
+                  const parsed = parseRepoUrl(url);
+                  if (parsed.valid && parsed.data) username = parsed.data.owner;
+                  else {
+                    const parts = u.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/");
+                    username = (parts[0] === "users" || parts[0] === "orgs") && parts.length > 1 ? parts[1] : parts[0];
+                  }
+                } else {
+                  const parts = u.pathname.replace(/^\/+/, "").replace(/\/+$/, "").split("/");
+                  username = (parts[0] === "users" || parts[0] === "orgs") && parts.length > 1 ? parts[1] : parts[0];
+                }
+                knownOwnerProfile = { url: `https://${host}/${username}`, provider: profProvider, type: "profile" as const, username };
+              } catch {
+                username = url.replace(/\/+$/, "").split("/").pop()!;
+                knownOwnerProfile = { url, provider: "github" as const, type: "profile" as const, username };
+              }
+            }
+            const result = await scrapePortfolio(url, provider!, knownOwnerProfile);
             result.sourceType = inputType;
             allResults.push(result);
             if (!opts.json && !opts.outputDir) printResult(result);
-          } else if (inputType === "repo_url") {
-            const parsed = parseRepoUrl(url);
-            if (parsed.valid && parsed.data) {
-              const d = parsed.data;
-              const repoLink = { url, provider: d.provider, type: "repo" as const, username: d.owner, repo: d.repo };
-              allResults.push({
-                source: url,
-                sourceType: "repo_url",
-                ownerProfile: {
-                  url: `https://${d.host}/${d.owner}`,
-                  provider: d.provider,
-                  type: "profile",
-                  username: d.owner,
-                },
-                confidence: "high",
-                ownedRepos: [repoLink],
-                externalRepos: [],
-                allLinks: [repoLink],
-                warnings: [`Already a ${d.provider} repo URL — extracted owner profile`],
-              });
-            }
-            if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
           } else {
             allResults.push({
               source: url,
@@ -289,6 +303,7 @@ async function main(): Promise<void> {
               ownerProfile: null,
               confidence: "none",
               ownedRepos: [],
+              contributions: [],
               externalRepos: [],
               allLinks: [],
               warnings: [`Input classified as '${inputType}' — cannot resolve`],

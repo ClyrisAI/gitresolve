@@ -31,14 +31,20 @@ export function parseRepoUrl(repoUrl: string): {
       return { valid: false, error: "Invalid repo path" };
     }
 
+    if (provider === "github" && GITHUB_RESERVED_PATHS.has(parts[0])) return { valid: false, error: "Reserved path" };
+    if (provider === "gitlab" && GITLAB_RESERVED_PATHS.has(parts[0])) return { valid: false, error: "Reserved path" };
+    if (provider === "bitbucket" && BITBUCKET_RESERVED_PATHS.has(parts[0])) return { valid: false, error: "Reserved path" };
+
     let owner: string;
     let repo: string;
     let fullPath: string;
+    let suffixParts: string[] = [];
 
     if (provider === "github" || provider === "bitbucket") {
       owner = parts[0];
       repo = parts[1];
       fullPath = `${owner}/${repo}`;
+      suffixParts = parts.slice(2);
     } else if (provider === "gitlab") {
       const stopIndex = parts.findIndex(
         (p) => p === "-" || p === "tree" || p === "blob"
@@ -53,6 +59,31 @@ export function parseRepoUrl(repoUrl: string): {
       owner = repoParts[0];
       repo = repoParts[repoParts.length - 1];
       fullPath = repoParts.join("/");
+      suffixParts = stopIndex === -1 ? [] : parts.slice(stopIndex);
+    }
+
+    let contribution: { type: "pull_request" | "issue"; number: string } | undefined;
+    
+    if (provider === "github") {
+      if (suffixParts[0] === "pull" && suffixParts[1] && /^\d+$/.test(suffixParts[1])) {
+        contribution = { type: "pull_request", number: suffixParts[1] };
+      } else if (suffixParts[0] === "issues" && suffixParts[1] && /^\d+$/.test(suffixParts[1])) {
+        contribution = { type: "issue", number: suffixParts[1] };
+      }
+    } else if (provider === "gitlab") {
+      const typePart = suffixParts[0] === "-" ? suffixParts[1] : suffixParts[0];
+      const numPart = suffixParts[0] === "-" ? suffixParts[2] : suffixParts[1];
+      if (typePart === "merge_requests" && numPart && /^\d+$/.test(numPart)) {
+        contribution = { type: "pull_request", number: numPart };
+      } else if (typePart === "issues" && numPart && /^\d+$/.test(numPart)) {
+        contribution = { type: "issue", number: numPart };
+      }
+    } else if (provider === "bitbucket") {
+      if (suffixParts[0] === "pull-requests" && suffixParts[1] && /^\d+$/.test(suffixParts[1])) {
+        contribution = { type: "pull_request", number: suffixParts[1] };
+      } else if (suffixParts[0] === "issues" && suffixParts[1] && /^\d+$/.test(suffixParts[1])) {
+        contribution = { type: "issue", number: suffixParts[1] };
+      }
     }
 
     return {
@@ -64,6 +95,7 @@ export function parseRepoUrl(repoUrl: string): {
         repo: repo!,
         fullPath: fullPath!,
         normalized: `https://${host}/${fullPath!}`,
+        contribution,
       },
     };
   } catch {
@@ -92,25 +124,15 @@ export function classifyInput(input: string): InputType {
   // LinkedIn — flag and skip
   if (host.includes("linkedin.com")) return "linkedin";
 
-  // GitHub-specific classification
-  if (host === "github.com" || host === "www.github.com") {
+  // Check if it's a valid repo URL
+  const repoResult = parseRepoUrl(trimmed);
+  if (repoResult.valid) return "repo_url";
+
+  // If it's a known git provider but not a valid repo, assume it's a profile
+  if (host === "github.com" || host === "www.github.com" || host === "gitlab.com" || host === "www.gitlab.com" || host === "bitbucket.org" || host === "www.bitbucket.org") {
     const parts = url.pathname.replace(/\/+$/, "").split("/").filter(Boolean);
-
-    if (parts.length === 0) return "unknown"; // just github.com
-    if (parts.length === 1) return "github_profile"; // github.com/username
-
-    // Check if it's a valid repo URL
-    const repoResult = parseRepoUrl(trimmed);
-    if (repoResult.valid) return "repo_url";
-
-    // Could be a profile with tabs like github.com/user?tab=repositories
-    return "github_profile";
-  }
-
-  // GitLab / Bitbucket repo URLs
-  if (host === "gitlab.com" || host === "bitbucket.org") {
-    const repoResult = parseRepoUrl(trimmed);
-    if (repoResult.valid) return "repo_url";
+    if (parts.length === 0) return "unknown";
+    return "git_profile";
   }
 
   // Everything else with a valid URL → assume portfolio
@@ -162,7 +184,8 @@ export function parseGitLink(rawUrl: string): ExtractedGitLink | null {
   const firstPart = parts[0].toLowerCase();
 
   // Skip static assets
-  if (firstPart.endsWith(".png") || firstPart.endsWith(".xml") || firstPart.endsWith(".json") || firstPart.endsWith(".ico") || firstPart.endsWith(".txt") || firstPart.endsWith(".svg")) {
+  const lastPart = parts[parts.length - 1].toLowerCase();
+  if (lastPart.endsWith(".png") || lastPart.endsWith(".xml") || lastPart.endsWith(".json") || lastPart.endsWith(".ico") || lastPart.endsWith(".txt") || lastPart.endsWith(".svg") || lastPart.endsWith(".woff") || lastPart.endsWith(".woff2") || lastPart.endsWith(".ttf") || lastPart.endsWith(".css") || lastPart.endsWith(".js") || lastPart.endsWith(".map")) {
     return null;
   }
 
@@ -200,11 +223,20 @@ export function parseGitLink(rawUrl: string): ExtractedGitLink | null {
       return { url: rawUrl, provider, type: "profile", username };
     }
 
-    // Use parseRepoUrl for proper validation
     const parsed = parseRepoUrl(rawUrl);
     if (parsed.valid) {
+      if (parsed.data!.contribution) {
+        return {
+          url: rawUrl, // Preserve raw URL for exact PR/Issue matching
+          provider,
+          type: parsed.data!.contribution.type,
+          username: parsed.data!.owner,
+          repo: parsed.data!.repo,
+          number: parsed.data!.contribution.number,
+        };
+      }
       return {
-        url: rawUrl,
+        url: parsed.data!.normalized,
         provider,
         type: "repo",
         username: parsed.data!.owner,

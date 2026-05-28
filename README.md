@@ -31,7 +31,7 @@ npm install -g @clyrisai/gitresolve puppeteer
 gitresolve [url] [options]
 
 Arguments:
-  [url]                     Direct URL to process (portfolio or resume)
+  [url]                     Direct URL to process (portfolio, profile, repo, or resume)
 
 Options:
 
@@ -59,17 +59,23 @@ Options:
 ## Examples
 
 ### Single Input (Standard Usage)
-Process a direct URL to a candidate's portfolio, GitHub profile, or resume PDF.
+Process a direct URL to a candidate's portfolio, GitHub/GitLab/Bitbucket profile, or resume PDF.
 
 ```bash
-# Process a standard portfolio website or profile link
+# Process a portfolio website
 gitresolve https://janedoe.dev
+
+# Process a GitHub profile — discovers all repos
+gitresolve https://github.com/janedoe
+
+# Process a GitLab profile (also works with /users/ routes)
+gitresolve https://gitlab.com/janedoe
+
+# Process a repo URL — scrapes the page and resolves the owner
+gitresolve https://github.com/janedoe/my-project
 
 # Process a remote resume PDF
 gitresolve https://example.com/resume.pdf
-
-# ⚠️ For SPAs requiring JavaScript rendering (requires global puppeteer install):
-gitresolve https://janedoe.dev
 ```
 
 *(Tip: If a resume URL doesn't end in `.pdf`, you can force it to be treated as a resume by adding `--type resume`)*
@@ -122,6 +128,7 @@ gitresolve --all --json
   },
   "confidence": "high",
   "ownedRepos": [],
+  "contributions": [],
   "externalRepos": [],
   "allLinks": [],
   "warnings": []
@@ -130,18 +137,19 @@ gitresolve --all --json
 
 ## How it works
 
-1. **Classifies input** to determine if it's a resume file, portfolio site, or direct git URL
-2. **Scrapes portfolios** using fetch, Puppeteer (for JS-rendered SPAs), or Browserless
+1. **Classifies input** to determine if it's a resume file, portfolio site, git profile, or direct repo URL
+2. **Scrapes the page** using fetch, Puppeteer (for JS-rendered SPAs), or Browserless
 3. **Parses PDF resumes** by extracting raw text and deeply buried hyperlink annotations
-4. **Extracts and sanitizes** GitHub, GitLab, and Bitbucket URLs
+4. **Extracts and sanitizes** GitHub, GitLab, and Bitbucket URLs — including PR/Issue links
 5. **Disambiguates owners** to separate the candidate's actual profile from referenced external repos
+6. **Categorizes links** into owned repos, contributions (PRs & Issues), and external references
 
 Each processed input returns a structured result:
 
 ```json
 {
-  "source": "https://janedoe.dev",
-  "sourceType": "portfolio",
+  "source": "https://github.com/janedoe",
+  "sourceType": "git_profile",
   "ownerProfile": { 
     "url": "https://github.com/janedoe", 
     "provider": "github", 
@@ -150,11 +158,24 @@ Each processed input returns a structured result:
   },
   "confidence": "high",
   "ownedRepos": [],
+  "contributions": [],
   "externalRepos": [],
   "allLinks": [],
   "warnings": []
 }
 ```
+
+## Supported Input Types
+
+| Input | Example | What Happens |
+|---|---|---|
+| **Portfolio site** | `https://janedoe.dev` | Scrapes page for git links |
+| **GitHub profile** | `https://github.com/janedoe` | Scrapes profile page, discovers repos |
+| **GitLab profile** | `https://gitlab.com/janedoe` | Scrapes profile, handles `/users/` routes |
+| **Bitbucket profile** | `https://bitbucket.org/janedoe` | Scrapes profile page |
+| **Repo URL** | `https://github.com/user/repo` | Scrapes repo page, resolves owner |
+| **PR/Issue URL** | `https://github.com/user/repo/pull/42` | Extracts as contribution |
+| **Resume PDF** | `./resume.pdf` or URL | Extracts text + hyperlink annotations |
 
 ## Browser Provider Configuration
 
@@ -194,6 +215,8 @@ try {
   const result = await scrapePortfolio('https://janedoe.dev', provider);
   console.log("Candidate Profile:", result.ownerProfile);
   console.log("Confidence Score:", result.confidence);
+  console.log("Owned Repos:", result.ownedRepos);
+  console.log("Contributions:", result.contributions);
 
   // --- Example B: Parse a resume PDF ---
   const resumeResult = await parseResume('./resumes/candidate1.pdf');

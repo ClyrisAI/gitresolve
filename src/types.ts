@@ -2,7 +2,7 @@
 
 export type InputType =
   | "repo_url"
-  | "github_profile"
+  | "git_profile"
   | "portfolio"
   | "resume_file"
   | "resume_url"
@@ -20,11 +20,12 @@ export interface ParsedRepo {
   repo: string;
   fullPath: string;
   normalized: string;
+  contribution?: { type: "pull_request" | "issue"; number: string };
 }
 
 // ─── Resolver Output ────────────────────────────────────────────────
 
-export type GitLinkType = "profile" | "repo" | "gist" | "other";
+export type GitLinkType = "profile" | "repo" | "gist" | "pull_request" | "issue" | "other";
 
 export interface ExtractedGitLink {
   url: string;
@@ -32,6 +33,7 @@ export interface ExtractedGitLink {
   type: GitLinkType;
   username: string;           // extracted username/owner
   repo?: string;              // repo name if type === "repo"
+  number?: string;            // PR or Issue number
 }
 
 /**
@@ -57,7 +59,8 @@ export interface ResolverResult {
 
   // ── Categorized repos ──
   ownedRepos: ExtractedGitLink[];          // repos where username === owner
-  externalRepos: ExtractedGitLink[];       // repos owned by someone else (contributions, references)
+  contributions: ExtractedGitLink[];       // Explicit PRs and Issues linked
+  externalRepos: ExtractedGitLink[];       // repos owned by someone else (references)
 
   // ── Raw data ──
   allLinks: ExtractedGitLink[];            // everything found, unfiltered
@@ -80,6 +83,7 @@ export interface AggregatedResult {
   confidence: "high" | "medium" | "low" | "none";
   
   ownedRepos: ExtractedGitLink[];
+  contributions: ExtractedGitLink[];
   externalRepos: ExtractedGitLink[];
   allLinks: ExtractedGitLink[];
   

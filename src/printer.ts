@@ -63,10 +63,22 @@ export function printResult(result: ResolverResult): void {
     }
   }
 
-  // ── External Repos (contributions / references) ──
+  // ── Contributions (PRs & Issues) ──
+  if (result.contributions.length > 0) {
+    console.log(`${c.cyan}│${c.reset}`);
+    console.log(`${c.cyan}│${c.reset}  ${c.magenta}✨ Contributions (${result.contributions.length}):${c.reset}`);
+    for (const repo of result.contributions) {
+      const typeLabel = repo.type === "pull_request" ? "PR" : "Issue";
+      const numberLabel = repo.number ? `#${repo.number}` : "";
+      console.log(`${c.cyan}│${c.reset}    ${c.magenta}↳${c.reset} ${repo.username}/${c.bold}${repo.repo}${c.reset} ${c.dim}[${typeLabel} ${numberLabel}]${c.reset}`);
+      console.log(`${c.cyan}│${c.reset}      ${c.dim}${repo.url}${c.reset}`);
+    }
+  }
+
+  // ── External Repos (references) ──
   if (result.externalRepos.length > 0) {
     console.log(`${c.cyan}│${c.reset}`);
-    console.log(`${c.cyan}│${c.reset}  ${c.blue}🔗 External repos / contributions (${result.externalRepos.length}):${c.reset}`);
+    console.log(`${c.cyan}│${c.reset}  ${c.blue}🔗 External references (${result.externalRepos.length}):${c.reset}`);
     for (const repo of result.externalRepos) {
       const repoName = repo.repo || repo.url.split("/").pop() || "?";
       console.log(`${c.cyan}│${c.reset}    ${c.dim}→${c.reset} ${repo.username}/${c.dim}${repoName}${c.reset}`);
@@ -97,6 +109,7 @@ export function printSummary(results: AggregatedResult[]): void {
   const low = results.filter((r) => r.confidence === "low").length;
   const none = results.filter((r) => r.confidence === "none").length;
   const totalOwned = results.reduce((sum, r) => sum + r.ownedRepos.length, 0);
+  const totalContributions = results.reduce((sum, r) => sum + r.contributions.length, 0);
   const totalExternal = results.reduce((sum, r) => sum + r.externalRepos.length, 0);
 
   console.log("");
@@ -105,7 +118,7 @@ export function printSummary(results: AggregatedResult[]): void {
   console.log(`${c.magenta}╠${"═".repeat(72)}╣${c.reset}`);
   console.log(`${c.magenta}║${c.reset}  Candidates:  ${c.bold}${total}${c.reset} total, ${c.green}${resolved} resolved${c.reset}, ${c.red}${total - resolved} unresolved${c.reset}`);
   console.log(`${c.magenta}║${c.reset}  Confidence:  ✅ ${high} high   🟡 ${medium} medium   🟠 ${low} low   ❌ ${none} none`);
-  console.log(`${c.magenta}║${c.reset}  Repos found: ${c.green}${totalOwned} owned${c.reset}, ${c.blue}${totalExternal} external${c.reset}`);
+  console.log(`${c.magenta}║${c.reset}  Repos found: ${c.green}${totalOwned} owned${c.reset}, ${c.magenta}${totalContributions} contributions${c.reset}, ${c.blue}${totalExternal} external${c.reset}`);
   console.log(`${c.magenta}╚${"═".repeat(72)}╝${c.reset}`);
 
   // Resolved candidates table
@@ -116,6 +129,7 @@ export function printSummary(results: AggregatedResult[]): void {
       provider: r.ownerProfile!.provider,
       username: r.ownerProfile!.username,
       owned: r.ownedRepos.length,
+      contributions: r.contributions.length,
       external: r.externalRepos.length,
       confidence: r.confidence,
     }));

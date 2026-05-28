@@ -13,6 +13,7 @@ export async function parseResume(filePath: string): Promise<ResolverResult> {
     ownerProfile: null,
     confidence: "none",
     ownedRepos: [],
+    contributions: [],
     externalRepos: [],
     allLinks: [],
     warnings: [],
@@ -81,6 +82,7 @@ export async function parseResume(filePath: string): Promise<ResolverResult> {
     result.ownerProfile = resolution.ownerProfile;
     result.confidence = resolution.confidence;
     result.ownedRepos = resolution.ownedRepos;
+    result.contributions = resolution.contributions;
     result.externalRepos = resolution.externalRepos;
     result.warnings.push(...resolution.warnings);
 

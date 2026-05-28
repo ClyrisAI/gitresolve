@@ -33,13 +33,15 @@ interface OwnerResolution {
   ownerProfile: ExtractedGitLink | null;
   confidence: "high" | "medium" | "low" | "none";
   ownedRepos: ExtractedGitLink[];
+  contributions: ExtractedGitLink[];
   externalRepos: ExtractedGitLink[];
   warnings: string[];
 }
 
 export function resolveOwnerAndCategorize(
   links: ExtractedGitLink[],
-  sourceContext?: string
+  sourceContext?: string,
+  knownOwnerProfile?: ExtractedGitLink
 ): OwnerResolution {
   const warnings: string[] = [];
 
@@ -48,6 +50,7 @@ export function resolveOwnerAndCategorize(
       ownerProfile: null,
       confidence: "none",
       ownedRepos: [],
+      contributions: [],
       externalRepos: [],
       warnings: ["No git links found"],
     };
@@ -55,10 +58,20 @@ export function resolveOwnerAndCategorize(
 
   const profileLinks = links.filter((l) => l.type === "profile");
   const repoLinks = links.filter((l) => l.type === "repo");
+  const contribLinks = links.filter((l) => l.type === "pull_request" || l.type === "issue");
 
   let ownerUsername: string | null = null;
   let ownerProfile: ExtractedGitLink | null = null;
   let confidence: "high" | "medium" | "low" | "none" = "none";
+
+  if (knownOwnerProfile) {
+    ownerProfile = knownOwnerProfile;
+    ownerUsername = knownOwnerProfile.username;
+    confidence = "high";
+    warnings.push(`Owner strictly determined by profile URL input: ${knownOwnerProfile.username}`);
+  }
+
+  if (!knownOwnerProfile) {
 
   // ═══════════════════════════════════════════════════════════════════
   // CASE 1: Exactly one unique profile username → owner
@@ -194,15 +207,26 @@ export function resolveOwnerAndCategorize(
       }
     }
   }
-
+  }
   // ═══════════════════════════════════════════════════════════════════
   // Categorize repos: owned vs external
   // ═══════════════════════════════════════════════════════════════════
 
   const ownedRepos: ExtractedGitLink[] = [];
+  const contributions: ExtractedGitLink[] = [];
   const externalRepos: ExtractedGitLink[] = [];
 
+  const seenUrls = new Set<string>();
+  const uniqueRepoLinks = [];
   for (const link of repoLinks) {
+    const lowerUrl = link.url.toLowerCase();
+    if (!seenUrls.has(lowerUrl)) {
+      seenUrls.add(lowerUrl);
+      uniqueRepoLinks.push(link);
+    }
+  }
+
+  for (const link of uniqueRepoLinks) {
     if (ownerUsername && link.username.toLowerCase() === ownerUsername.toLowerCase()) {
       ownedRepos.push(link);
     } else {
@@ -210,10 +234,19 @@ export function resolveOwnerAndCategorize(
     }
   }
 
+  for (const link of contribLinks) {
+    const lowerUrl = link.url.toLowerCase();
+    if (!seenUrls.has(lowerUrl)) {
+      seenUrls.add(lowerUrl);
+      contributions.push(link);
+    }
+  }
+
   return {
     ownerProfile,
     confidence,
     ownedRepos,
+    contributions,
     externalRepos,
     warnings,
   };

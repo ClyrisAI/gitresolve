@@ -14,23 +14,23 @@ import {
 describe("classifyInput", () => {
   // ── GitHub Profiles ────────────────────────────────────────────────
   describe("GitHub profiles", () => {
-    it("classifies github.com/username as github_profile", () => {
-      expect(classifyInput("https://github.com/octocat")).toBe("github_profile");
+    it("classifies github.com/username as git_profile", () => {
+      expect(classifyInput("https://github.com/octocat")).toBe("git_profile");
     });
 
     it("classifies with trailing slash", () => {
-      expect(classifyInput("https://github.com/octocat/")).toBe("github_profile");
+      expect(classifyInput("https://github.com/octocat/")).toBe("git_profile");
     });
 
     it("classifies with query params (tab=repositories)", () => {
       expect(classifyInput("https://github.com/octocat?tab=repositories")).toBe(
-        "github_profile"
+        "git_profile"
       );
     });
 
     it("classifies www.github.com profile", () => {
       expect(classifyInput("https://www.github.com/octocat")).toBe(
-        "github_profile"
+        "git_profile"
       );
     });
   });
@@ -139,7 +139,7 @@ describe("classifyInput", () => {
 
     it("handles whitespace around input", () => {
       expect(classifyInput("  https://github.com/octocat  ")).toBe(
-        "github_profile"
+        "git_profile"
       );
     });
   });

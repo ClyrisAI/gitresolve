@@ -11,7 +11,8 @@ import { resolveOwnerAndCategorize } from "./disambiguator.js";
  */
 export async function scrapePortfolio(
   url: string,
-  provider: BrowserProvider
+  provider: BrowserProvider,
+  knownOwnerProfile?: import("./types.js").ExtractedGitLink
 ): Promise<ResolverResult> {
   const result: ResolverResult = {
     source: url,
@@ -19,6 +20,7 @@ export async function scrapePortfolio(
     ownerProfile: null,
     confidence: "none",
     ownedRepos: [],
+    contributions: [],
     externalRepos: [],
     allLinks: [],
     warnings: [],
@@ -45,10 +47,11 @@ export async function scrapePortfolio(
     }
 
     // Resolve owner and categorize repos
-    const resolution = resolveOwnerAndCategorize(result.allLinks, "portfolio");
+    const resolution = resolveOwnerAndCategorize(result.allLinks, "portfolio", knownOwnerProfile);
     result.ownerProfile = resolution.ownerProfile;
     result.confidence = resolution.confidence;
     result.ownedRepos = resolution.ownedRepos;
+    result.contributions = resolution.contributions;
     result.externalRepos = resolution.externalRepos;
     result.warnings.push(...resolution.warnings);
 
