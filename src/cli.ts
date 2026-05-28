@@ -101,7 +101,22 @@ program
 program.parse();
 
 const opts = program.opts();
-const urlArg = program.args[0];
+
+function normalizeUrlString(input: string): string {
+  if (!input) return input;
+  if (/\.(pdf|docx?|rtf)$/i.test(input) || input.startsWith("./") || input.startsWith("/") || input.startsWith("~/")) {
+    return input;
+  }
+  if (!input.startsWith("http://") && !input.startsWith("https://")) {
+    return `https://${input}`;
+  }
+  return input;
+}
+
+let urlArg = program.args[0];
+if (urlArg) {
+  urlArg = normalizeUrlString(urlArg);
+}
 
 // ─── Determine What to Run ──────────────────────────────────────────
 
@@ -255,7 +270,8 @@ async function main(): Promise<void> {
 
         const urls = records
           .map((r) => r.url || r.URL || r.link || r.Link || Object.values(r)[0])
-          .filter(Boolean);
+          .filter(Boolean)
+          .map(normalizeUrlString);
 
         if (!opts.json) {
           console.log(`${c.dim}   Found ${urls.length} URL(s)${c.reset}`);
