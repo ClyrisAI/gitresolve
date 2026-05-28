@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 
   const urlTypeHint = opts.type;
   const urlClassifiedType = urlArg ? classifyInput(urlArg) : undefined;
-  const isUrlPortfolio = urlArg && urlTypeHint !== "resume" && (urlTypeHint === "portfolio" || urlClassifiedType === "portfolio");
+  const isUrlPortfolio = urlArg && urlTypeHint !== "resume" && (urlTypeHint === "portfolio" || urlClassifiedType === "portfolio" || urlClassifiedType === "github_profile");
 
   if (runPortfolios || isUrlPortfolio) {
     provider = await createProvider(providerName);
@@ -185,23 +185,11 @@ async function main(): Promise<void> {
           inputType = "portfolio";
         }
         
-        if (inputType === "portfolio") {
+        if (inputType === "portfolio" || inputType === "github_profile") {
           const result = await scrapePortfolio(urlArg, provider!);
+          result.sourceType = inputType;
           allResults.push(result);
           if (!opts.json && !opts.outputDir) printResult(result);
-        } else if (inputType === "github_profile") {
-          const username = urlArg.replace(/\/+$/, "").split("/").pop()!;
-          allResults.push({
-            source: urlArg,
-            sourceType: "github_profile",
-            ownerProfile: { url: urlArg, provider: "github", type: "profile", username },
-            confidence: "high",
-            ownedRepos: [],
-            externalRepos: [],
-            allLinks: [{ url: urlArg, provider: "github", type: "profile", username }],
-            warnings: ["Already a GitHub profile URL — no scraping needed"],
-          });
-          if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
         } else if (inputType === "repo_url") {
           const parsed = parseRepoUrl(urlArg);
           if (parsed.valid && parsed.data) {
@@ -267,23 +255,11 @@ async function main(): Promise<void> {
         for (const url of urls) {
           const inputType = classifyInput(url);
 
-          if (inputType === "portfolio") {
+          if (inputType === "portfolio" || inputType === "github_profile") {
             const result = await scrapePortfolio(url, provider!);
+            result.sourceType = inputType;
             allResults.push(result);
             if (!opts.json && !opts.outputDir) printResult(result);
-          } else if (inputType === "github_profile") {
-            const username = url.replace(/\/+$/, "").split("/").pop()!;
-            allResults.push({
-              source: url,
-              sourceType: "github_profile",
-              ownerProfile: { url, provider: "github", type: "profile", username },
-              confidence: "high",
-              ownedRepos: [],
-              externalRepos: [],
-              allLinks: [{ url, provider: "github", type: "profile", username }],
-              warnings: ["Already a GitHub profile URL — no scraping needed"],
-            });
-            if (!opts.json && !opts.outputDir) printResult(allResults[allResults.length - 1]);
           } else if (inputType === "repo_url") {
             const parsed = parseRepoUrl(url);
             if (parsed.valid && parsed.data) {

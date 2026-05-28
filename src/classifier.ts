@@ -128,7 +128,11 @@ const GITHUB_RESERVED_PATHS = new Set([
   "new", "organizations", "enterprise", "team", "customer-stories",
   "readme", "codespaces", "copilot", "issues", "pulls",
   "discussions", "actions", "projects", "packages", "stars",
-  "orgs", "apps", "site",
+  "orgs", "apps", "site", "solutions", "resources", "contact",
+  "github", "_private", "get-started", "search-github", "articles",
+  "site-policy", "trust-center", "partners", "accelerator", 
+  "premium-support", "mcp", "why-github", "assets", "images", 
+  "avatars", "search", "users", "blog", "support", "status"
 ]);
 
 const GITLAB_RESERVED_PATHS = new Set([
@@ -156,6 +160,11 @@ export function parseGitLink(rawUrl: string): ExtractedGitLink | null {
   if (parts.length === 0) return null;
 
   const firstPart = parts[0].toLowerCase();
+
+  // Skip static assets
+  if (firstPart.endsWith(".png") || firstPart.endsWith(".xml") || firstPart.endsWith(".json") || firstPart.endsWith(".ico") || firstPart.endsWith(".txt") || firstPart.endsWith(".svg")) {
+    return null;
+  }
 
   // Skip reserved paths per provider
   if (provider === "github" && GITHUB_RESERVED_PATHS.has(firstPart)) return null;
